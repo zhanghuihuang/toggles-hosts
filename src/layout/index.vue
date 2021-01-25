@@ -20,7 +20,7 @@
     <el-main>
       <el-input
           type="textarea"
-          :rows="100"
+          :rows="20"
           placeholder="请输入Hosts文件内容"
           v-model="currentHostContent">
       </el-input>
@@ -29,9 +29,15 @@
 </template>
 
 <script>
+const {ipcRenderer} = require('electron')
 const defaultHostId = "1"
-const fs = require("fs")
-const path = require('path')
+
+console.log(ipcRenderer.sendSync('synchronous-message', 'ping')) // prints "pong"
+
+ipcRenderer.on('asynchronous-reply', (event, arg) => {
+  console.log(arg) // prints "pong"
+})
+ipcRenderer.send('asynchronous-message', 'ping')
 
 export default {
   name: "Layout",
@@ -65,10 +71,6 @@ export default {
     for (let host of this.hostList) {
       if (host.id == this.currentHostId) {
         this.currentHostContent = host.content
-        let basedir = path.resolve("./")
-        console.log(basedir)
-        var data = fs.readFileSync('D:\\username.name');
-        console.log("同步读取: " + data.toString());
       }
     }
   },
