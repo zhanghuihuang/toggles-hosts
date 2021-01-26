@@ -22,29 +22,24 @@
           type="textarea"
           :rows="20"
           placeholder="请输入Hosts文件内容"
-          v-model="currentHostContent">
+          v-model="currentHostContent"
+          :disabled="currentTextAreaState">
       </el-input>
     </el-main>
   </el-container>
 </template>
 
 <script>
-const {ipcRenderer} = require('electron')
+const fs = window.require('fs')
 const defaultHostId = "1"
 
-console.log(ipcRenderer.sendSync('synchronous-message', 'ping')) // prints "pong"
-
-ipcRenderer.on('asynchronous-reply', (event, arg) => {
-  console.log(arg) // prints "pong"
-})
-ipcRenderer.send('asynchronous-message', 'ping')
-
 export default {
-  name: "Layout",
+  name: "ToggleHost",
   data() {
     return {
       currentHostId: defaultHostId,
       currentHostContent: "",
+      currentTextAreaState: false,
       hostList: [
         {
           id: 1,
@@ -67,11 +62,15 @@ export default {
       ]
     };
   },
+  created() {
+
+  },
   mounted() {
     for (let host of this.hostList) {
       if (host.id == this.currentHostId) {
         this.currentHostContent = host.content
       }
+      this.currentTextAreaState = host.id != defaultHostId
     }
   },
   methods: {
@@ -84,6 +83,7 @@ export default {
           } else {
             this.currentHostContent = host.content
           }
+          this.currentTextAreaState = host.id != defaultHostId
         }
       } else {
         //如果关,则设置默认为当前host
@@ -92,6 +92,7 @@ export default {
             host.switchFlag = true
             this.currentHostContent = host.content
           }
+          this.currentTextAreaState = host.id != defaultHostId
         }
       }
     }

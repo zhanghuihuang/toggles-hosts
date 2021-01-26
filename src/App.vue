@@ -1,16 +1,16 @@
 <template>
   <div id="app">
-    <Layout/>
+    <ToggleHost/>
   </div>
 </template>
 
 <script>
-import Layout from "@/layout/index.vue";
+import ToggleHost from "views/index.vue";
 
 export default {
   name: "App",
   components: {
-    Layout
+    ToggleHost
   }
 };
 </script>

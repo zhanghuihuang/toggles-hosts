@@ -35,16 +35,6 @@ async function createWindow() {
     }
 }
 
-ipcMain.on('asynchronous-message', (event, arg) => {
-    console.log(arg) // prints "ping"
-    event.reply('asynchronous-reply', 'pong')
-})
-
-ipcMain.on('synchronous-message', (event, arg) => {
-    console.log(arg) // prints "ping"
-    event.returnValue = 'pong'
-})
-
 // Quit when all windows are closed.
 app.on("window-all-closed", () => {
     // On macOS it is common for applications and their menu bar
@@ -73,6 +63,9 @@ app.on("ready", async () => {
         }
     }
     createWindow();
+    fs.mkdir('D:\\toggleHost\\', {recursive: true}, (err) => {
+        if (err) throw err;
+    });
 });
 
 // Exit cleanly on request from parent process in development mode.
