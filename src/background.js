@@ -1,6 +1,6 @@
 "use strict";
 
-import {app, protocol, BrowserWindow, ipcMain} from "electron";
+import {app, protocol, BrowserWindow, Menu} from "electron";
 import {createProtocol} from "vue-cli-plugin-electron-builder/lib";
 import installExtension, {VUEJS_DEVTOOLS} from "electron-devtools-installer";
 
@@ -12,6 +12,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 async function createWindow() {
+    Menu.setApplicationMenu(null) //取消菜单栏
     // Create the browser window.
     const win = new BrowserWindow({
         width: 800,
