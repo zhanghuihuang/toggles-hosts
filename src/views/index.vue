@@ -93,52 +93,53 @@ export default {
     };
   },
   created() {
-    fs.readFile(defaultHostPath, "utf-8", (err, data) => {
-      if (err) {
-        console.log("读取默认host文件错误", err)
-        this.defaultHostConfig.content = ""
-      } else {
-        this.defaultHostConfig.content = data
-      }
-      console.log("created阶段默认的host配置", this.defaultHostConfig)
-    })
+    try {
+      let data = fs.readFileSync(defaultHostPath, 'utf-8');
+      this.defaultHostConfig.content = data
+    } catch (err) {
+      console.log("读取默认host文件错误", err)
+      this.defaultHostConfig.content = ""
+    }
+    console.log("created阶段默认的host配置", this.defaultHostConfig)
   },
   mounted() {
-    fs.readFile(toggleHostConfigPath, "utf-8", (err, data) => {
-      if (err) {
-        console.log("读取配置文件错误", err)
+    let data
+    try {
+      data = fs.readFileSync(toggleHostConfigPath, 'utf-8');
+      try {
+        data = JSON.parse(data)
+        console.log("读取json配置", data)
+      } catch (parseErr) {
+        console.log("解析配置文件错误", parseErr.message, data);
+        console.error(parseErr);
         data = {}
+      }
+    } catch (err) {
+      console.log("读取配置文件错误", err)
+      data = {}
+    }
+    console.log("mounted阶段默认的host配置", this.defaultHostConfig)
+    if (data.currentHostConfig) {
+      data.currentHostConfig = Object.assign(data.currentHostConfig, {switchFlag: true})
+    }
+    if (!data.currentHostConfig || data.currentHostConfig.id == this.defaultHostConfig.id) {
+      data.currentHostConfig = Object.assign({}, this.defaultHostConfig, {switchFlag: true})
+    }
+    if (!(data.hostList instanceof Array) || data.hostList.length == 0) {
+      data.hostList = []
+      data.hostList.push(Object.assign({}, this.defaultHostConfig))
+      if (data.currentHostConfig.id != this.defaultHostConfig.id) {
+        data.hostList.push(Object.assign({}, data.currentHostConfig))
       } else {
-        try {
-          data = JSON.parse(data)
-          console.log("读取json配置", data)
-        } catch (parseErr) {
-          console.log("解析配置文件错误", parseErr.message, data);
-          console.error(parseErr);
-          data = {}
-        }
+        data.hostList[0].switchFlag = true
       }
-      console.log("mounted阶段默认的host配置", this.defaultHostConfig)
-      if (!data.currentHostConfig) {
-        //没有当前host配置,取默认
-        data.currentHostConfig = Object.assign({}, this.defaultHostConfig, {switchFlag: true})
-      } else {
-        data.currentHostConfig = Object.assign(data.currentHostConfig, {switchFlag: true})
-      }
-      if (!(data.hostList instanceof Array)) {
-        data.hostList = []
-        data.hostList.push(Object.assign({}, this.defaultHostConfig))
-        if (data.currentHostConfig.id != this.defaultHostConfig.id) {
-          data.hostList.push(Object.assign({}, data.currentHostConfig))
-        } else {
-          data.hostList[0].switchFlag = true
-        }
-      }
-      console.log("处理后的host配置", data)
-      Object.assign(this, data)
-      this.writeToggleHostConfig()
-      this.writeHostFile()
-    })
+    } else {
+      data.hostList[0] = Object.assign({}, this.defaultHostConfig, {switchFlag: data.currentHostConfig.id == this.defaultHostConfig.id})
+    }
+    console.log("处理后的host配置", data)
+    Object.assign(this, data)
+    this.writeToggleHostConfig()
+    this.writeHostFile()
   },
   methods: {
     openDialog() {
@@ -188,12 +189,9 @@ export default {
     },
     changeHostContent() {
       for (let host of this.hostList) {
-        if (host.id == this.defaultHostConfig.id) {
-          break;
-        }
         if (host.id == this.currentHostConfig.id) {
           host.content = this.currentHostConfig.content
-          console.log("当前host配置", this.currentHostConfig)
+          console.log("改变内容后,当前host配置", this.currentHostConfig)
           this.writeToggleHostConfig()
           this.writeHostFile()
           break;
@@ -218,7 +216,7 @@ export default {
           }
         }
       }
-      console.log("当前host配置", this.currentHostConfig)
+      console.log("切换开关后,当前host配置", this.currentHostConfig)
       this.writeToggleHostConfig()
       this.writeHostFile()
     },
