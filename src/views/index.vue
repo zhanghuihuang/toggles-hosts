@@ -8,7 +8,8 @@
         <el-row v-for="host in hostList" v-bind:key="host.id" style="margin-top:10px;padding-left: 10px">
           <el-col :span="16">
             <label style="margin-right: 5px">{{ host.name }}</label>
-            <el-link type="primary" v-show="host.id != 1 && host.id != currentHostId" @click="delHost(host.id)"><i
+            <el-link type="primary" v-show="host.id != defaultHostConfig.id && host.id != currentHostConfig.id"
+                     @click="delHost(host.id)"><i
                 class="el-icon-delete"></i></el-link>
           </el-col>
           <el-col :span="8">
@@ -28,8 +29,8 @@
             type="textarea"
             :rows="20"
             placeholder="请输入Hosts文件内容"
-            v-model="currentHostContent"
-            :disabled="currentTextAreaState"
+            v-model="currentHostConfig.content"
+            :disabled="currentHostConfig.id == defaultHostConfig.id"
             @change="changeHostContent">
         </el-input>
       </el-main>
@@ -50,7 +51,6 @@
 
 <script>
 const fs = window.require('fs')
-const defaultHostId = 1
 const toggleHostConfigPath = "D:\\toggleHost\\toggleHost.json"
 const hostPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 const defaultHostPath = "D:\\toggleHost\\defaultHost"
@@ -71,9 +71,13 @@ export default {
       }
     };
     return {
-      currentHostId: 0,
-      currentHostContent: "",
-      currentTextAreaState: true,
+      defaultHostConfig: {
+        id: 1,
+        name: "默认Host配置",
+        content: "",
+        switchFlag: false
+      },
+      currentHostConfig: {},
       hostList: [],
       dialogFormVisible: false,
       form: {
@@ -92,37 +96,48 @@ export default {
     fs.readFile(defaultHostPath, "utf-8", (err, data) => {
       if (err) {
         console.log("读取默认host文件错误", err)
+        this.defaultHostConfig.content = ""
       } else {
-        this.hostList = [
-          {
-            id: defaultHostId,
-            name: "默认Host配置",
-            content: data,
-            switchFlag: false
-          }
-        ]
+        this.defaultHostConfig.content = data
       }
+      console.log("created阶段默认的host配置", this.defaultHostConfig)
     })
   },
   mounted() {
     fs.readFile(toggleHostConfigPath, "utf-8", (err, data) => {
       if (err) {
         console.log("读取配置文件错误", err)
+        data = {}
       } else {
-        data = JSON.parse(data)
-        console.log("读取json配置", typeof data, data)
-        data.hostList[0] = this.hostList[0]
-        console.log("设置默认host", data)
-        Object.assign(this, data)
-        for (let host of this.hostList) {
-          if (host.id == this.currentHostId) {
-            this.currentHostContent = host.content
-            host.switchFlag = true
-            this.currentTextAreaState = host.id == defaultHostId
-            this.writeHostFile()
-          }
+        try {
+          data = JSON.parse(data)
+          console.log("读取json配置", data)
+        } catch (parseErr) {
+          console.log("解析配置文件错误", parseErr.message, data);
+          console.error(parseErr);
+          data = {}
         }
       }
+      console.log("mounted阶段默认的host配置", this.defaultHostConfig)
+      if (!data.currentHostConfig) {
+        //没有当前host配置,取默认
+        data.currentHostConfig = Object.assign({}, this.defaultHostConfig, {switchFlag: true})
+      } else {
+        data.currentHostConfig = Object.assign(data.currentHostConfig, {switchFlag: true})
+      }
+      if (!(data.hostList instanceof Array)) {
+        data.hostList = []
+        data.hostList.push(Object.assign({}, this.defaultHostConfig))
+        if (data.currentHostConfig.id != this.defaultHostConfig.id) {
+          data.hostList.push(Object.assign({}, data.currentHostConfig))
+        } else {
+          data.hostList[0].switchFlag = true
+        }
+      }
+      console.log("处理后的host配置", data)
+      Object.assign(this, data)
+      this.writeToggleHostConfig()
+      this.writeHostFile()
     })
   },
   methods: {
@@ -132,17 +147,13 @@ export default {
     addHost() {
       //添加一个host配置
       let max = 1;
-      let defaultHost = null;
       for (let host of this.hostList) {
         max = Math.max(max, host.id)
-        if (host.id == defaultHostId) {
-          defaultHost = host
-        }
       }
       let host = {
         id: max + 1,
         name: this.form.name,
-        content: defaultHost.content,
+        content: this.defaultHostConfig.content,
         switchFlag: false
       }
       this.hostList.push(host)
@@ -151,16 +162,24 @@ export default {
       this.writeToggleHostConfig()
     },
     delHost(id) {
-      if (id === this.currentHostId) {
+      let message = ''
+      if (id == this.currentHostConfig.id) {
+        message = "开启的host配置不能删除"
+      }
+      if (id == this.defaultHostConfig.id) {
+        message = "默认的host配置不能删除"
+      }
+      if (message) {
         this.$message({
           showClose: true,
-          message: '开启的host配置不能删除',
+          message: message,
           type: 'warning'
         });
+        return
       }
       let newHostList = []
       for (let host of this.hostList) {
-        if (host.id != id || host.id == defaultHostId) {
+        if (host.id != id) {
           newHostList.push(host)
         }
       }
@@ -169,8 +188,14 @@ export default {
     },
     changeHostContent() {
       for (let host of this.hostList) {
-        if (host.id == this.currentHostId) {
-          host.content = this.currentHostContent
+        if (host.id == this.defaultHostConfig.id) {
+          break;
+        }
+        if (host.id == this.currentHostConfig.id) {
+          host.content = this.currentHostConfig.content
+          console.log("当前host配置", this.currentHostConfig)
+          this.writeToggleHostConfig()
+          this.writeHostFile()
           break;
         }
       }
@@ -179,32 +204,27 @@ export default {
       if (newValue) {
         //如果开,则关闭所有其他的host
         for (let host of this.hostList) {
-          if (host.id != id) {
-            host.switchFlag = false
-          } else {
-            this.currentHostContent = host.content
-            this.currentTextAreaState = host.id == defaultHostId
+          Object.assign(host, {switchFlag: host.id == id})
+          if (host.id == id) {
+            Object.assign(this.currentHostConfig, host)
           }
         }
       } else {
         //如果关,则设置默认为当前host
         for (let host of this.hostList) {
-          if (host.id == defaultHostId) {
-            host.switchFlag = true
-            this.currentHostContent = host.content
-            this.currentTextAreaState = true
+          Object.assign(host, {switchFlag: host.id == this.defaultHostConfig.id})
+          if (host.id == this.defaultHostConfig.id) {
+            Object.assign(this.currentHostConfig, host)
           }
         }
       }
-      console.log(this.currentTextAreaState)
+      console.log("当前host配置", this.currentHostConfig)
       this.writeToggleHostConfig()
       this.writeHostFile()
     },
     writeToggleHostConfig() {
       let currentData = {
-        currentHostId: this.currentHostId,
-        currentHostContent: this.currentHostContent,
-        currentTextAreaState: this.currentTextAreaState,
+        currentHostConfig: this.currentHostConfig,
         hostList: this.hostList
       }
       fs.writeFile(toggleHostConfigPath, JSON.stringify(currentData), (err) => {
@@ -214,7 +234,8 @@ export default {
       })
     },
     writeHostFile() {
-      fs.writeFile(hostPath, this.currentHostContent, (err) => {
+      console.log("写入host文件", this.currentHostConfig)
+      fs.writeFile(hostPath, this.currentHostConfig.content, (err) => {
         if (err) {
           console.log("写入配置文件错误", err)
         }
